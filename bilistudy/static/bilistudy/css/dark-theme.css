@@ -19,7 +19,8 @@
     --dark-border: #334155;          /* 边框颜色 */
     --dark-text-primary: #e6e8eb;    /* 主要文字颜色 */
     --dark-text-secondary: #94a3b8;  /* 次要文字颜色 */
-    --dark-text-muted: #64748b;      /* 静音文字颜色 */
+    --dark-text-muted: #a7b4c6;      /* 静音文字颜色 */
+    --dark-on-light-text: #1f2937;   /* 深色模式中浅色容器上的文字 */
 }
 
 /* 深色主题下的基础样式 */
@@ -62,7 +63,42 @@
 
 /* 小标题 */
 [data-theme="dark"] small {
-    color: var(--dark-text-muted);
+    color: var(--dark-text-secondary);
+}
+
+/* Bootstrap文本工具类在深色模式中的可读性修复 */
+[data-theme="dark"] .text-muted,
+[data-theme="dark"] .text-secondary {
+    color: var(--dark-text-secondary) !important;
+}
+
+[data-theme="dark"] .bg-light,
+[data-theme="dark"] .card.bg-light,
+[data-theme="dark"] .card-header.bg-light,
+[data-theme="dark"] .card-body.bg-light,
+[data-theme="dark"] .input-group-text.bg-light,
+[data-theme="dark"] .fullscreen-quick-actions.bg-light {
+    background: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-primary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+[data-theme="dark"] .bg-light .text-muted,
+[data-theme="dark"] .card.bg-light .text-muted,
+[data-theme="dark"] .card-header.bg-light .text-muted,
+[data-theme="dark"] .card-body.bg-light .text-muted,
+[data-theme="dark"] .input-group-text.bg-light .text-muted {
+    color: var(--dark-text-secondary) !important;
+}
+
+[data-theme="dark"] .badge.bg-light,
+[data-theme="dark"] .badge.bg-light.text-dark {
+    background: #e5edf8 !important;
+    color: var(--dark-on-light-text) !important;
+}
+
+[data-theme="dark"] .modal-header.bg-warning.text-dark {
+    color: #111827 !important;
 }
 
 /* 首页特殊元素 */

@@ -1329,25 +1329,6 @@ def ai_chat(request):
                 'error': '请输入您的问题'
             })
 
-        # 配置Gemini API
-        try:
-            import google.generativeai as genai
-        except ImportError:
-            return JsonResponse({
-                'success': False,
-                'error': '请先安装google-generativeai包: pip install google-generativeai'
-            })
-
-        api_key = os.getenv('GEMINI_API_KEY')
-        if not api_key:
-            return JsonResponse({
-                'success': False,
-                'error': 'AI服务暂时不可用，请配置GEMINI_API_KEY环境变量'
-            })
-
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')  # 使用更稳定的模型
-
         # 获取或创建会话ID
         session_id = request.session.get('chat_session_id')
         if not session_id:
@@ -1381,6 +1362,13 @@ def ai_chat(request):
             if ai_model == 'deepseek':
                 ai_response = call_deepseek_api(system_prompt, user_message, chat_history)
             else:  # 默认使用gemini
+                api_key = os.getenv('GEMINI_API_KEY')
+                if not api_key:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Gemini服务暂时不可用，请配置GEMINI_API_KEY环境变量，或切换到DeepSeek模型。'
+                    })
+
                 api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
 
                 headers = {
@@ -1496,33 +1484,13 @@ def call_deepseek_api(system_prompt, user_message, chat_history=""):
     """调用DeepSeek API"""
     try:
         import requests
-        import json
 
-        # 🔑 DeepSeek API密钥
         api_key = os.getenv('DEEPSEEK_API_KEY')
+        if not api_key:
+            return "DeepSeek API调用失败：服务器未配置DEEPSEEK_API_KEY环境变量。"
 
-        # 详细的调试信息
-        print(f"[DEBUG] 开始调用DeepSeek API")
-        print(f"[DEBUG] API Key前缀: {api_key[:10]}...")
-
-        # 先测试基本网络连接
-        try:
-            test_response = requests.get("https://www.baidu.com", timeout=5)
-            print(f"[DEBUG] 基本网络连接正常: {test_response.status_code}")
-        except Exception as e:
-            print(f"[DEBUG] 基本网络连接失败: {str(e)}")
-            return f"网络连接失败：{str(e)}。请检查网络设置。"
-
-        # 测试DeepSeek域名解析
-        try:
-            test_response = requests.get("https://api.deepseek.com", timeout=10)
-            print(f"[DEBUG] DeepSeek域名连接: {test_response.status_code}")
-        except Exception as e:
-            print(f"[DEBUG] DeepSeek域名连接失败: {str(e)}")
-            return f"无法连接到DeepSeek服务器：{str(e)}。可能是DNS问题或防火墙阻止。"
-
-        api_url = "https://api.deepseek.com/v1/chat/completions"
-        print(f"[DEBUG] API URL: {api_url}")
+        api_url = "https://api.deepseek.com/chat/completions"
+        model_name = os.getenv('DEEPSEEK_MODEL', 'deepseek-v4-flash')
 
         headers = {
             'Content-Type': 'application/json',
@@ -1541,7 +1509,7 @@ def call_deepseek_api(system_prompt, user_message, chat_history=""):
         # 如果有聊天历史，添加到消息中
         if chat_history.strip():
             messages.append({
-                "role": "assistant",
+                "role": "system",
                 "content": f"以下是我们之前的对话历史：{chat_history}"
             })
 
@@ -1552,34 +1520,30 @@ def call_deepseek_api(system_prompt, user_message, chat_history=""):
         })
 
         data = {
-            "model": "deepseek-chat",
+            "model": model_name,
             "messages": messages,
             "stream": False,
             "max_tokens": 2000,
-            "temperature": 0.7
+            "temperature": 0.7,
+            "thinking": {"type": "disabled"}
         }
 
-        print(f"[DEBUG] 发送API请求...")
         response = requests.post(api_url, headers=headers, json=data, timeout=60)
-
-        print(f"[DEBUG] 响应状态码: {response.status_code}")
-        print(f"[DEBUG] 响应头: {dict(response.headers)}")
 
         if response.status_code == 200:
             result = response.json()
-            print(f"[DEBUG] 响应内容: {json.dumps(result, ensure_ascii=False, indent=2)}")
 
             if 'choices' in result and len(result['choices']) > 0:
-                content = result['choices'][0]['message']['content']
-                print(f"[DEBUG] 成功获取回复，长度: {len(content)}")
+                content = result['choices'][0].get('message', {}).get('content', '')
+                if not content:
+                    content = result['choices'][0].get('message', {}).get('reasoning_content', '')
+                if not content:
+                    return "DeepSeek API返回了空响应，请稍后再试。"
                 return content
             else:
-                print(f"[DEBUG] API返回格式异常: {result}")
                 return "DeepSeek API返回了空响应，请稍后再试。"
         else:
             error_text = response.text
-            print(f"[DEBUG] API调用失败: {response.status_code}")
-            print(f"[DEBUG] 错误详情: {error_text}")
 
             if response.status_code == 402:
                 return "DeepSeek API调用失败：账户余额不足或需要付费。请检查您的DeepSeek账户余额。"
@@ -1593,16 +1557,12 @@ def call_deepseek_api(system_prompt, user_message, chat_history=""):
                 return f"DeepSeek API调用失败：HTTP {response.status_code}。错误详情：{error_text[:200]}"
 
     except requests.exceptions.ConnectionError as e:
-        print(f"[DEBUG] 连接错误: {str(e)}")
         return f"无法连接到DeepSeek API服务：{str(e)}。请检查网络连接、DNS设置或防火墙配置。"
     except requests.exceptions.Timeout as e:
-        print(f"[DEBUG] 超时错误: {str(e)}")
         return "DeepSeek API响应超时，请稍后再试。"
     except requests.exceptions.SSLError as e:
-        print(f"[DEBUG] SSL错误: {str(e)}")
         return f"SSL连接错误：{str(e)}。请检查网络安全设置。"
     except Exception as e:
-        print(f"[DEBUG] 未知错误: {str(e)}")
         import traceback
         traceback.print_exc()
         return f"DeepSeek API调用出现错误：{str(e)[:200]}"
@@ -2871,16 +2831,25 @@ def export_plan_pdf(request, plan_id):
         buffer = BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
 
-        # 注册中文字体（尝试使用系统字体）
-        try:
-            pdfmetrics.registerFont(TTFont('SimHei', 'C:/Windows/Fonts/simhei.ttf'))
-            chinese_font = 'SimHei'
-        except:
-            try:
-                pdfmetrics.registerFont(TTFont('SimSun', 'C:/Windows/Fonts/simsun.ttc'))
-                chinese_font = 'SimSun'
-            except:
-                chinese_font = 'Helvetica'  # 回退到默认字体
+        chinese_font = 'Helvetica'
+        font_candidates = [
+            ('SimHei', 'C:/Windows/Fonts/simhei.ttf'),
+            ('SimSun', 'C:/Windows/Fonts/simsun.ttc'),
+            ('NotoSansCJK', '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'),
+            ('NotoSansCJK', '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc'),
+            ('DroidSansFallback', '/usr/share/fonts/google-droid/DroidSansFallback.ttf'),
+            ('WenQuanYiMicroHei', '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc'),
+            ('SourceHanSans', '/usr/share/fonts/opentype/source-han-sans/SourceHanSansCN-Regular.otf'),
+            ('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),
+        ]
+        for font_name, font_path in font_candidates:
+            if os.path.exists(font_path):
+                try:
+                    pdfmetrics.registerFont(TTFont(font_name, font_path))
+                    chinese_font = font_name
+                    break
+                except Exception:
+                    continue
 
         # 创建样式
         styles = getSampleStyleSheet()
@@ -3192,6 +3161,9 @@ def export_plan_pdf(request, plan_id):
                 grade = "D (待改进)"
                 summary_text = "您的学习表现有待提升，建议重新规划学习计划。"
         else:
+            efficiency_score = 0
+            consistency_score = 0
+            overall_score = 0
             grade = "N/A (无数据)"
             summary_text = "暂无足够数据进行评估，建议开始记录学习情况。"
 
