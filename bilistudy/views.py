@@ -172,8 +172,8 @@ def search_videos(request):
         params['order'] = 'stow'  # 点赞数排序（收藏数，通常与点赞相关）
     
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': 'https://www.bilibili.com',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+        'Referer': 'https://search.bilibili.com/',
         'Cookie': 'buvid3=CFF74DA7-E79E-4B53-BB96-FC74AB8CD2F3184997infoc'
     }
     
