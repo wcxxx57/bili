@@ -318,7 +318,6 @@ def search_videos(request):
                     page_range = range(page - 2, page + 3)
 
             # 为JavaScript准备视频数据
-            import json
             videos_json = json.dumps(videos[:3] if videos else [])  # 只传递前3个视频用于AI分析
 
             return render(request, 'bilistudy/search_results.html', {
